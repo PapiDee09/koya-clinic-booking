@@ -87,7 +87,7 @@ def slots(provider: str|None=None):
     with db() as conn:
         rows=conn.execute("""SELECT s.id,s.provider,s.start_at,s.end_at,NOT EXISTS
         (SELECT 1 FROM bookings b WHERE b.slot_id=s.id AND b.status='confirmed')
-        FROM slots s WHERE (%s IS NULL OR s.provider=%s) ORDER BY s.start_at,s.id""",(provider,provider)).fetchall()
+        FROM slots s WHERE (%s::text IS NULL OR s.provider=%s) ORDER BY s.start_at,s.id""",(provider,provider)).fetchall()
     return {"slots":[{"id":r[0],"provider":r[1],"start":iso(r[2]),"end":iso(r[3]),"available":r[4]} for r in rows]}
 
 def normalized(body):
