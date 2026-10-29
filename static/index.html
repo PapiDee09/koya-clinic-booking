@@ -73,8 +73,9 @@ el("book").onclick=async()=>{
  try{
   if(!el("slot").value)throw Error("No appointment is selected.");
   if(!el("name").value.trim())throw Error("Enter the patient's name.");
+  const chosen=el("slot").selectedOptions[0]?.textContent||el("slot").value;
   const data=await api("/bookings",{method:"POST",headers:{"Idempotency-Key":crypto.randomUUID()},body:JSON.stringify({slot_id:el("slot").value,name:el("name").value,email:el("email").value})});
-  note("confirmation","Booking confirmed. Reference: "+data.id,"success");
+  note("confirmation","Booking confirmed.\\nAppointment: "+chosen+"\\nPatient: "+data.name+"\\nEmail: "+data.email+"\\nReference: "+data.id+"\\nStatus: "+data.status,"success");
   await run(false);
  }catch(e){note("confirmation",e.message,"error")}finally{button.disabled=false}
 };
