@@ -12,15 +12,28 @@ from uuid import uuid4
 BASE = os.getenv("KOYA_URL", "https://koya-clinic-booking-xi.vercel.app").rstrip("/")
 KEY = os.getenv("KOYA_API_KEY") or getpass.getpass("Koya API key: ")
 
+def parse_response(response):
+    raw = response.read()
+    try:
+        return json.loads(raw)
+    except (ValueError, UnicodeDecodeError):
+        preview = raw[:600].decode("utf-8", errors="replace")
+        return {"error": "Non-JSON response", "status": response.status, "content_type": response.headers.get("Content-Type", ""), "body_preview": preview}
+
 def call(method, path, payload=None, key=KEY, headers=None):
     data = None if payload is None else json.dumps(payload).encode()
     req = urllib.request.Request(BASE + path, method=method, data=data,
                                  headers={"X-API-Key":key,"Content-Type":"application/json",**(headers or {})})
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
-            return r.status,json.load(r),dict(r.headers)
+            result = parse_response(r)
+            if result.get("error") == "Non-JSON response":
+                print("HTTP response from", method, path, ":", result)
+            return r.status,result,dict(r.headers)
     except urllib.error.HTTPError as exc:
-        return exc.code,json.load(exc),dict(exc.headers)
+        result = parse_response(exc)
+        print("HTTP error from", method, path, ":", exc.code, result)
+        return exc.code,result,dict(exc.headers)
 
 def expect(cond, label):
     if not cond:
