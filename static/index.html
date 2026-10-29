@@ -5,7 +5,7 @@
 </style></head>
 <body><main><p class="eyebrow">KOYA CLINIC · BOOKING PORTAL</p><h1>Care that fits your day.</h1><p class="muted">Confirm an existing clinic booking, or use the optional appointment form if the clinic has supplied available slots.</p>
 <section><h2>Start here</h2><p class="muted">Enter your API key and the email used for your bookings.</p><div class="fields"><div><label for="key">API key</label><input id="key" type="password" autocomplete="off" placeholder="Enter API key"></div><div><label for="email">Email (email)</label><input id="email" type="email" autocomplete="email" placeholder="ada@example.com"></div></div><button id="start" type="button">Check appointments and bookings</button><p id="status" class="muted" role="status" aria-live="polite"></p><details id="new-booking"><summary>Book an appointment</summary><div class="appointment-panel"><h2>Book an appointment</h2><p class="muted">Available appointment slots are loaded from the API when you open this form.</p><p id="availability" class="muted" aria-live="polite">Check available slots to load appointment times from the clinic database.</p>
-<div id="booking-form"><label for="slot">Slot (slot_id) *</label><select id="slot" required><option value="">Check availability to select a slot</option></select><button id="refresh-slots" class="secondary" type="button">Check available slots</button><p id="slot-details" class="hint"></p><label for="name">Patient name (name) *</label><input id="name" autocomplete="name" placeholder="Ada Obi" required><p class="hint">Booking email comes from the email field above. Only slot_id, name and email are sent, exactly as the Koya API requires.</p><button id="book" type="button" disabled>Confirm appointment booking</button></div>
+<div id="booking-form"><div class="fields"><div><label for="booking-key">Booking API key *</label><input id="booking-key" type="password" autocomplete="off" placeholder="Clinic API key"></div><div><label for="booking-email">Patient email *</label><input id="booking-email" type="email" autocomplete="email" placeholder="ada@example.com"></div></div><label for="slot">Slot (slot_id) *</label><select id="slot" required><option value="">Check availability to select a slot</option></select><button id="refresh-slots" class="secondary" type="button">Check available slots</button><p id="slot-details" class="hint"></p><label for="name">Patient name (name) *</label><input id="name" autocomplete="name" placeholder="Ada Obi" required><p class="hint">Only slot_id, name and patient email are sent, as required by Koya.</p><button id="book" type="button" disabled>Confirm appointment booking</button></div>
 </div></details><div id="confirmation-panel" class="booking" hidden><strong>Appointment confirmation</strong><p id="confirmation" role="status" aria-live="polite"></p></div></section>
 <section id="history-section"><h2>My bookings</h2><p id="history-status" class="muted" aria-live="polite">No lookup performed yet.</p><div id="history"></div><button id="more" type="button" class="secondary" hidden>Load more</button></section>
 
@@ -13,14 +13,14 @@
 const el=id=>document.getElementById(id);
 const state={cursor:null,email:"",busy:false};
 function note(id,message,kind="muted"){const node=el(id);node.className=kind;node.textContent=message}
-async function api(path,options={}){
- const response=await fetch(path,{...options,headers:{"X-API-Key":el("key").value.trim(),"Content-Type":"application/json",...(options.headers||{})}});
+async function api(path,options={},key=el("key").value.trim()){
+ const response=await fetch(path,{...options,headers:{"X-API-Key":key,"Content-Type":"application/json",...(options.headers||{})}});
  let payload;try{payload=await response.json()}catch{throw Error("Server returned an unexpected response ("+response.status+").")}
  if(!response.ok)throw Error(payload.error||"Request failed ("+response.status+").");
  return payload;
 }
 async function slots(){
- const data=await api("/slots");
+ const data=await api("/slots",{},el("booking-key").value.trim()||el("key").value.trim());
  const now=Date.now();
  const eligible=data.slots.filter(s=>s.available && Number.isFinite(Date.parse(s.start)) && Date.parse(s.start)>now);
  const picker=el("slot");picker.replaceChildren();if(!eligible.length)picker.add(new Option("No bookable slots available",""));
@@ -71,8 +71,8 @@ async function run(more=false){
   }
  }catch(e){note("history-status",e.message,"error")}finally{state.busy=false;el("start").disabled=false;el("more").disabled=false}
 }
-async function refreshSlots(){if(!el("key").value.trim()){note("availability","Enter your API key above to check clinic slots.","error");return}note("availability","Checking clinic availability…");try{await slots()}catch(e){el("book").disabled=true;note("availability",e.message,"error")}}
-el("new-booking").addEventListener("toggle",()=>{if(el("new-booking").open&&el("key").value.trim())refreshSlots()});el("refresh-slots").onclick=refreshSlots;
+async function refreshSlots(){if(!el("booking-key").value.trim()&&!el("key").value.trim()){note("availability","Enter an API key in this form to check clinic slots.","error");return}note("availability","Checking clinic availability…");try{await slots()}catch(e){el("book").disabled=true;note("availability",e.message,"error")}}
+el("new-booking").addEventListener("toggle",()=>{if(el("new-booking").open&&(el("booking-key").value.trim()||el("key").value.trim()))refreshSlots()});el("refresh-slots").onclick=refreshSlots;
 el("start").onclick=()=>run(false);el("more").onclick=()=>run(true);
 el("book").onclick=async()=>{
  const button=el("book");button.disabled=true;
@@ -80,9 +80,12 @@ el("book").onclick=async()=>{
   if(!el("slot").value)throw Error("No appointment is selected.");
   if(!el("name").value.trim())throw Error("Enter the patient's name.");
   const chosen=el("slot").selectedOptions[0]?.textContent||el("slot").value;
-  const data=await api("/bookings",{method:"POST",headers:{"Idempotency-Key":crypto.randomUUID()},body:JSON.stringify({slot_id:el("slot").value,name:el("name").value,email:el("email").value})});
+  if(!el("booking-email").value.trim()||!el("booking-email").checkValidity())throw Error("Enter a valid patient email in the booking form.");
+  const data=await api("/bookings",{method:"POST",headers:{"Idempotency-Key":crypto.randomUUID()},body:JSON.stringify({slot_id:el("slot").value,name:el("name").value,email:el("booking-email").value})},el("booking-key").value.trim()||el("key").value.trim());
   el("confirmation-panel").hidden=false;
   note("confirmation","Booking confirmed.\\nslot_id: "+data.slot_id+"\\nname: "+data.name+"\\nemail: "+data.email+"\\nid: "+data.id+"\\nstatus: "+data.status+"\\ncreated_at: "+data.created_at,"success");
+  el("key").value=el("booking-key").value.trim()||el("key").value;
+  el("email").value=data.email;
   await run(false);
   el("new-booking").open=false;
   el("confirmation-panel").scrollIntoView({behavior:"smooth",block:"center"});
