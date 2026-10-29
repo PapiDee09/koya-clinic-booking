@@ -25,11 +25,8 @@ def err(msg, code, headers=None):
 def db():
     return psycopg.connect(os.environ["DATABASE_URL"])
 
-@app.on_event("startup")
-def init():
-    if os.getenv("DATABASE_URL"):
-        with db() as conn:
-            conn.execute((ROOT/"schema.sql").read_text())
+# Tables are provisioned with schema.sql during deployment, not on each
+# serverless cold start. Concurrent startup DDL can race in PostgreSQL.
 
 @app.middleware("http")
 async def auth(req: Request, next_call):
