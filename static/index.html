@@ -9,8 +9,8 @@
 <div class="fields"><div><label for="name">Patient full name *</label><input id="name" autocomplete="name" placeholder="Full legal name"></div><div><label for="phone">Phone (clinic reference only)</label><input id="phone" type="tel" autocomplete="tel" placeholder="Phone number"></div></div>
 <div class="fields"><div><label for="patient-id">Patient ID (if issued)</label><input id="patient-id" placeholder="Clinic-issued patient identifier"></div><div><label for="clinic-id">Clinic ID (if issued)</label><input id="clinic-id" placeholder="Clinic location identifier"></div></div>
 <p class="hint">Patient ID and clinic ID are different. The assessment API does not issue or verify these IDs, and optional reference fields are not saved. Booking sends only the supported slot ID, name and email.</p>
-<button id="book" type="button">Book appointment</button></div><p id="confirmation" role="status" aria-live="polite"></p>
-</div></details></section>
+<button id="book" type="button">Book appointment</button></div>
+</div></details><div id="confirmation-panel" class="booking" hidden><strong>Appointment confirmation</strong><p id="confirmation" role="status" aria-live="polite"></p></div></section>
 <section id="history-section"><h2>My bookings</h2><p id="history-status" class="muted" aria-live="polite">No lookup performed yet.</p><div id="history"></div><button id="more" type="button" class="secondary" hidden>Load more</button></section>
 
 </main><script>
@@ -81,10 +81,11 @@ el("book").onclick=async()=>{
   if(!el("name").value.trim())throw Error("Enter the patient's name.");
   const chosen=el("slot").selectedOptions[0]?.textContent||el("slot").value;
   const data=await api("/bookings",{method:"POST",headers:{"Idempotency-Key":crypto.randomUUID()},body:JSON.stringify({slot_id:el("slot").value,name:el("name").value,email:el("email").value})});
-  note("confirmation","Booking confirmed.\\nAppointment: "+chosen+"\\nPatient: "+data.name+"\\nEmail: "+data.email+"\\nReference: "+data.id+"\\nStatus: "+data.status,"success");
+  el("confirmation-panel").hidden=false;
+  note("confirmation","Booking confirmed.\nAppointment: "+chosen+"\nPatient: "+data.name+"\nEmail: "+data.email+"\nReference: "+data.id+"\nStatus: "+data.status,"success");
   await run(false);
   el("new-booking").open=false;
-  el("history-section").scrollIntoView({behavior:"smooth",block:"start"});
- }catch(e){note("confirmation",e.message,"error")}finally{button.disabled=false}
+  el("confirmation-panel").scrollIntoView({behavior:"smooth",block:"center"});
+ }catch(e){el("confirmation-panel").hidden=false;note("confirmation",e.message,"error")}finally{button.disabled=false}
 };
 </script></body></html>
