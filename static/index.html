@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Koya Clinic — Appointment Booking</title>
+<style>
+:root{font-family:system-ui,-apple-system,sans-serif;background:#f4f8f7;color:#142b2e}
+body{margin:0}main{max-width:720px;margin:52px auto;padding:20px}
+h1{font-size:clamp(2rem,5vw,3rem);letter-spacing:-.055em;margin:8px 0}
+p{line-height:1.5}.muted{color:#587177}.eyebrow{font-size:.75rem;font-weight:800;letter-spacing:.14em;color:#087061}
+section{background:#fff;border:1px solid #d7e5e3;border-radius:20px;padding:26px;margin:20px 0;box-shadow:0 6px 25px #005a4410}
+label{display:block;font-weight:650;font-size:.9rem;margin:16px 0 6px}
+input,select,button{box-sizing:border-box;width:100%;padding:13px;border-radius:11px;font:inherit}
+input,select{border:1px solid #aec7c2;background:#fff}
+button{border:0;background:#086e5e;color:white;font-weight:750;cursor:pointer;margin-top:18px}
+button:disabled{opacity:.5;cursor:not-allowed}.error{color:#a9213b}.success{color:#0b7960}
+#message{white-space:pre-wrap}
+</style></head>
+<body><main><p class="eyebrow">KOYA CLINIC · APPOINTMENTS</p><h1>Care that fits your day.</h1><p class="muted">View available appointments and book a time with your preferred clinician.</p>
+<section><h2>Connect to the clinic</h2><label for="key">API key</label><input id="key" type="password" autocomplete="off" placeholder="Enter your API key"><button id="load">View available appointments</button></section>
+<section><h2>Book an appointment</h2><label for="slot">Available appointment</label><select id="slot"><option value="">Load appointments first</option></select><label for="name">Your full name</label><input id="name" autocomplete="name"><label for="email">Your email</label><input id="email" type="email" autocomplete="email"><button id="book">Confirm booking</button></section>
+<section aria-live="polite"><h2>Booking confirmation</h2><p id="message" class="muted">Confirmation details will appear here.</p></section>
+</main><script>
+const el=id=>document.getElementById(id);
+async function api(path,opts={}){const response=await fetch(path,{...opts,headers:{"X-API-Key":el("key").value,"Content-Type":"application/json",...(opts.headers||{})}});const data=await response.json();if(!response.ok)throw Error(data.error||"Request failed");return data}
+function report(value,kind="muted"){el("message").className=kind;el("message").textContent=value}
+async function load(){try{const r=await api("/slots");const available=r.slots.filter(s=>s.available);const dropdown=el("slot");dropdown.replaceChildren();if(!available.length){const o=new Option("No appointments currently available","");dropdown.add(o)}else available.forEach(s=>dropdown.add(new Option(s.provider+" · "+new Date(s.start).toLocaleString(),s.id)));report(available.length+" available appointment(s).")}catch(e){report(e.message,"error")}}
+el("load").onclick=load;
+el("book").onclick=async()=>{const button=el("book");button.disabled=true;try{if(!el("slot").value)throw Error("Select an available appointment");const result=await api("/bookings",{method:"POST",headers:{"Idempotency-Key":crypto.randomUUID()},body:JSON.stringify({slot_id:el("slot").value,name:el("name").value,email:el("email").value})});report("Booking confirmed!\nReference: "+result.id+"\nPatient: "+result.name+"\nStatus: "+result.status,"success");await load()}catch(e){report(e.message,"error")}finally{button.disabled=false}};
+</script></body></html>
