@@ -5,7 +5,7 @@
 </style></head>
 <body><main><p class="eyebrow">KOYA CLINIC · BOOKING PORTAL</p><h1>Care that fits your day.</h1><p class="muted">Confirm an existing clinic booking, or use the optional appointment form if the clinic has supplied available slots.</p>
 <section><h2>Start here</h2><p class="muted">Enter your API key and the email used for your bookings.</p><div class="fields"><div><label for="key">API key</label><input id="key" type="password" autocomplete="off" placeholder="Enter API key"></div><div><label for="email">Email (email)</label><input id="email" type="email" autocomplete="email" placeholder="ada@example.com"></div></div><button id="start" type="button">Check appointments and bookings</button><p id="status" class="muted" role="status" aria-live="polite"></p><details id="new-booking"><summary>Book an appointment</summary><div class="appointment-panel"><h2>Book an appointment</h2><p class="muted">Enter your details and choose an appointment date and time.</p><p id="availability" class="muted" aria-live="polite"></p>
-<div id="booking-form"><div class="fields"><div><label for="name">Patient full name *</label><input id="name" autocomplete="name" placeholder="Ada Obi" required></div><div><label for="booking-email">Patient email *</label><input id="booking-email" type="email" autocomplete="email" placeholder="ada@example.com" required></div></div><div class="fields"><div><label for="appointment-date">Appointment date *</label><input id="appointment-date" type="date" required></div><div><label for="slot">Available appointment time *</label><select id="slot" required><option value="">Choose a date to see times</option></select></div></div><p id="slot-details" class="hint"></p><button id="book" type="button" disabled>Book appointment</button></div>
+<div id="booking-form"><div class="fields"><div><label for="name">Patient full name *</label><input id="name" autocomplete="name" placeholder="Ada Obi" required></div><div><label for="booking-email">Patient email *</label><input id="booking-email" type="email" autocomplete="email" placeholder="ada@example.com" required></div></div><div class="fields"><div><label for="appointment-date">Appointment date *</label><select id="appointment-date" required><option value="">Loading available dates…</option></select></div><div><label for="slot">Available appointment time *</label><select id="slot" required><option value="">Choose a date to see times</option></select></div></div><p id="slot-details" class="hint"></p><button id="book" type="button" disabled>Book appointment</button></div>
 </div></details><div id="confirmation-panel" class="booking" hidden><strong>Appointment confirmation</strong><p id="confirmation" role="status" aria-live="polite"></p><p id="future-key-note" class="hint" hidden>Booking successful. Please meet clinic staff to obtain an API key for future use. No key has been emailed automatically.</p></div></section>
 <section id="history-section"><h2>My bookings</h2><p id="history-status" class="muted" aria-live="polite">No lookup performed yet.</p><div id="history"></div><button id="more" type="button" class="secondary" hidden>Load more</button></section>
 
@@ -23,19 +23,21 @@ let appointmentSlots=[];
 function showDateSlots(){
  const date=el("appointment-date").value,picker=el("slot");picker.replaceChildren();
  const matches=appointmentSlots.filter(slot=>slot.start.slice(0,10)===date);
- picker.add(new Option(matches.length?"Select appointment time":"No appointments for this date",""));
- for(const slot of matches)picker.add(new Option(new Date(slot.start).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})+" · "+slot.provider+" · "+slot.id,slot.id));
- picker.onchange=()=>{const slot=matches.find(item=>item.id===picker.value);note("slot-details",slot?"Provider: "+slot.provider+" · "+new Date(slot.start).toLocaleString()+" – "+new Date(slot.end).toLocaleTimeString():"");el("book").disabled=!slot};
+ picker.add(new Option(matches.length?"Choose an available time":"No appointments available",""));
+ for(const slot of matches)picker.add(new Option(new Date(slot.start).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})+" – "+new Date(slot.end).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})+" · "+slot.provider,slot.id));
+ picker.onchange=()=>{const slot=matches.find(item=>item.id===picker.value);note("slot-details",slot?"Selected: "+slot.provider+" · "+new Date(slot.start).toLocaleString()+" – "+new Date(slot.end).toLocaleTimeString():"");el("book").disabled=!slot};
  el("book").disabled=true;note("slot-details","");
 }
 async function slots(apiKey=el("key").value.trim()){
  const data=await api("/slots",{},apiKey);
  appointmentSlots=data.slots.filter(slot=>slot.available&&Date.parse(slot.start)>Date.now()).sort((a,b)=>a.start.localeCompare(b.start));
- const dateInput=el("appointment-date");
- dateInput.min=new Date().toLocaleDateString("en-CA");
- if(appointmentSlots.length&&!dateInput.value)dateInput.value=appointmentSlots[0].start.slice(0,10);
+ const dateInput=el("appointment-date"),oldDate=dateInput.value,dates=[...new Set(appointmentSlots.map(slot=>slot.start.slice(0,10)))];
+ dateInput.replaceChildren();
+ dateInput.add(new Option(dates.length?"Choose an available date":"No available dates",""));
+ for(const date of dates)dateInput.add(new Option(new Date(date+"T12:00:00Z").toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long",year:"numeric"}),date));
+ dateInput.value=dates.includes(oldDate)?oldDate:(dates[0]||"");
  showDateSlots();
- note("availability",appointmentSlots.length?"Choose a date to see available appointment times.":"No bookable appointment slots are currently available.");
+ note("availability",dates.length?"Choose a date, then select one of its available appointment times.":"No future appointment slots are currently available from the clinic API. Please contact the clinic; no appointments have been invented.");
 }
 el("appointment-date").onchange=showDateSlots;
 async function bookings(more=false){
