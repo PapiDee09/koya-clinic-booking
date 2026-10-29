@@ -8,7 +8,7 @@ import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import psycopg
 from fastapi import FastAPI, Request
@@ -129,7 +129,8 @@ async def make_booking(req: Request):
                 return err("too many booking attempts",429,{"Retry-After":str(retry)})
         return err(str(e),400)
     key=req.headers.get("Idempotency-Key")
-    digest=hashlib.sha256(json.dumps(body,sort_keys=True,separators=(",",":")).encode()).hexdigest()
+    # Idempotency compares the supplied JSON body, not its normalized storage representation.
+    digest=hashlib.sha256(json.dumps(raw,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()).hexdigest()
     with db() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT pg_advisory_xact_lock(89011245)")
@@ -173,7 +174,9 @@ def list_bookings(email: str="",limit: str="10",cursor: str|None=None):
     if cursor:
         try:
             arr=json.loads(base64.urlsafe_b64decode(cursor+"="*(-len(cursor)%4)))
-            since,ident=parse_dt(arr[0]),arr[1]
+            if not isinstance(arr,list) or len(arr)!=2 or not isinstance(arr[1],str):
+                raise ValueError("invalid cursor structure")
+            since,ident=parse_dt(arr[0]),str(UUID(arr[1]))
         except Exception:
             return err("invalid cursor",400)
     with db() as conn:
