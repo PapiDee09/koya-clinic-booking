@@ -1,64 +1,81 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Koya Clinic — Appointment Booking</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Koya Clinic · Booking portal</title>
 <style>
-:root{font-family:system-ui,-apple-system,sans-serif;background:#f4f8f7;color:#142b2e}
-body{margin:0}main{max-width:720px;margin:52px auto;padding:20px}
-h1{font-size:clamp(2rem,5vw,3rem);letter-spacing:-.055em;margin:8px 0}
-p{line-height:1.5}.muted{color:#587177}.eyebrow{font-size:.75rem;font-weight:800;letter-spacing:.14em;color:#087061}
-section{background:#fff;border:1px solid #d7e5e3;border-radius:20px;padding:26px;margin:20px 0;box-shadow:0 6px 25px #005a4410}
-label{display:block;font-weight:650;font-size:.9rem;margin:16px 0 6px}
-input,select,button{box-sizing:border-box;width:100%;padding:13px;border-radius:11px;font:inherit}
-input,select{border:1px solid #aec7c2;background:#fff}
-button{border:0;background:#086e5e;color:white;font-weight:750;cursor:pointer;margin-top:18px}
-button:disabled{opacity:.5;cursor:not-allowed}.secondary{background:#e7f2ef;color:#086e5e}.booking-card{padding:16px;border:1px solid #d7e5e3;border-radius:12px;margin-top:12px;overflow-wrap:anywhere}.booking-card p{margin:6px 0}.booking-card button{margin-top:8px}.error{color:#a9213b}.success{color:#0b7960}
-#message{white-space:pre-wrap}
+:root{font:16px system-ui,-apple-system,sans-serif;color:#173237;background:#f4f8f7}*{box-sizing:border-box}body{margin:0}main{max-width:880px;margin:44px auto;padding:0 20px}h1{font-size:clamp(2rem,5vw,2.8rem);letter-spacing:-.05em;margin:10px 0}h2{font-size:1.25rem;margin:0 0 10px}p{line-height:1.5}.muted{color:#5a7076}.eyebrow{font-size:.77rem;letter-spacing:.13em;color:#087061;font-weight:800}section{background:white;border:1px solid #d9e6e2;border-radius:18px;padding:25px;margin:18px 0;box-shadow:0 6px 25px #005a4410}.fields{display:grid;grid-template-columns:1fr 1fr;gap:15px}@media(max-width:600px){.fields{grid-template-columns:1fr}}label{display:block;font-size:.9rem;font-weight:700;margin:14px 0 7px}input,select,button{font:inherit;padding:13px;width:100%;border-radius:10px}input,select{border:1px solid #abc8c3;background:#fff}button{border:0;background:#096c5b;color:#fff;font-weight:750;cursor:pointer;margin-top:15px}button:disabled{opacity:.55;cursor:not-allowed}button.secondary{background:#e8f3ef;color:#095e51}button.small{font-size:.87rem;padding:10px;max-width:180px}.error{color:#ab2738}.success{color:#0b765c}.booking{border:1px solid #d9e6e2;border-radius:12px;padding:15px;margin:12px 0;overflow-wrap:anywhere}.booking p{margin:5px 0}#status,#confirmation,#history-status{white-space:pre-wrap}[hidden]{display:none!important}
 </style></head>
-<body><main><p class="eyebrow">KOYA CLINIC · APPOINTMENTS</p><h1>Care that fits your day.</h1><p class="muted">View available appointments and book a time with your preferred clinician.</p>
-<section><h2>Connect to the clinic</h2><label for="key">API key</label><input id="key" type="password" autocomplete="off" placeholder="Enter your API key"><button id="load">View available appointments</button></section>
-<section><h2>Book an appointment</h2><label for="slot">Available appointment</label><select id="slot"><option value="">Load appointments first</option></select><label for="name">Your full name</label><input id="name" autocomplete="name"><label for="email">Your email</label><input id="email" type="email" autocomplete="email"><button id="book">Confirm booking</button></section>
-<section aria-live="polite"><h2>Booking confirmation</h2><p id="message" class="muted">Confirmation details will appear here.</p></section>
-<section aria-labelledby="history-title"><h2 id="history-title">My bookings</h2><p class="muted">Enter your API key above and your email to retrieve your appointment history.</p><label for="history-email">Booking email</label><input id="history-email" type="email" autocomplete="email" placeholder="you@example.com"><button id="history-load" type="button">View my bookings</button><p id="history-message" class="muted" aria-live="polite"></p><div id="booking-history"></div><button id="history-more" class="secondary" type="button" hidden>Load more bookings</button></section>
+<body><main><p class="eyebrow">KOYA CLINIC · BOOKING PORTAL</p><h1>Appointments, without the guesswork.</h1><p class="muted">Check your booking history or see whether appointment slots have actually been provided. No availability is assumed.</p>
+<section><h2>Start here</h2><p class="muted">Enter your API key and the email used for your bookings.</p><div class="fields"><div><label for="key">API key</label><input id="key" type="password" autocomplete="off" placeholder="Enter API key"></div><div><label for="email">Booking email</label><input id="email" type="email" autocomplete="email" placeholder="you@example.com"></div></div><button id="start" type="button">Check appointments and my bookings</button><p id="status" class="muted" role="status" aria-live="polite">Enter both details to begin.</p></section>
+<section id="history-section"><h2>My bookings</h2><p id="history-status" class="muted" aria-live="polite">No lookup performed yet.</p><div id="history"></div><button id="more" type="button" class="secondary" hidden>Load more</button></section>
+<section id="availability-section"><h2>Appointment availability</h2><p id="availability" class="muted" aria-live="polite">Not checked yet.</p><div id="booking-form" hidden><label for="slot">Available appointment</label><select id="slot"></select><label for="name">Patient's full name</label><input id="name" autocomplete="name" placeholder="Enter full name"><button id="book" type="button">Confirm booking</button></div><p id="confirmation" role="status" aria-live="polite"></p></section>
 </main><script>
 const el=id=>document.getElementById(id);
-async function api(path,opts={}){const response=await fetch(path,{...opts,headers:{"X-API-Key":el("key").value,"Content-Type":"application/json",...(opts.headers||{})}});const data=await response.json();if(!response.ok)throw Error(data.error||"Request failed");return data}
-function report(value,kind="muted"){el("message").className=kind;el("message").textContent=value}
-async function load(){try{const r=await api("/slots");const available=r.slots.filter(s=>s.available);const dropdown=el("slot");dropdown.replaceChildren();if(!available.length){const o=new Option("No appointments currently available","");dropdown.add(o)}else available.forEach(s=>dropdown.add(new Option(s.provider+" · "+new Date(s.start).toLocaleString(),s.id)));report(available.length+" available appointment(s).")}catch(e){report(e.message,"error")}}
-let historyCursor=null,historyEmail="",historyBusy=false;
-function historyStatus(message,kind="muted"){const node=el("history-message");node.className=kind;node.textContent=message}
-async function viewBookings(next=false){
-  if(historyBusy)return;
-  const email=el("history-email").value.trim()||el("email").value.trim();
-  if(!email){historyStatus("Enter your booking email address.","error");return}
-  if(!el("key").value.trim()){historyStatus("Enter your API key above.","error");return}
-  if(next&&(!historyCursor||email.toLowerCase()!==historyEmail))return;
-  historyBusy=true;el("history-load").disabled=true;el("history-more").disabled=true;
-  if(!next){historyCursor=null;historyEmail=email.toLowerCase();el("booking-history").replaceChildren()}
-  historyStatus("Loading bookings...");
-  try{
-    const params=new URLSearchParams({email:historyEmail,limit:"10"});
-    if(next)params.set("cursor",historyCursor);
-    const result=await api("/bookings?"+params.toString());
-    for(const b of result.bookings){
-      const card=document.createElement("article");card.className="booking-card";
-      const heading=document.createElement("strong");heading.textContent=b.name+" — "+b.status;
-      const info=document.createElement("p");info.textContent="Booking ID: "+b.id;
-      const detail=document.createElement("p");detail.className="muted";detail.textContent="Slot: "+b.slot_id+" · Created: "+new Date(b.created_at).toLocaleString();
-      card.append(heading,info,detail);
-      if(b.status==="confirmed"){
-        const cancel=document.createElement("button");cancel.type="button";cancel.className="secondary";cancel.textContent="Cancel booking";
-        cancel.onclick=async()=>{if(!confirm("Cancel this appointment?"))return;cancel.disabled=true;try{await api("/bookings/"+encodeURIComponent(b.id),{method:"DELETE"});heading.textContent=b.name+" — cancelled";cancel.remove();historyStatus("Booking cancelled.","success");await load()}catch(e){historyStatus(e.message,"error");cancel.disabled=false}};
-        card.append(cancel);
-      }
-      el("booking-history").append(card);
-    }
-    historyCursor=result.next_cursor||null;
-    el("history-more").hidden=!historyCursor;
-    historyStatus(result.bookings.length ? "Booking history loaded." : (next?"No more bookings.":"No bookings found for this email."),"muted");
-  }catch(e){historyStatus(e.message,"error");el("history-more").hidden=true}
-  finally{historyBusy=false;el("history-load").disabled=false;el("history-more").disabled=false}
+const state={cursor:null,email:"",busy:false};
+function note(id,message,kind="muted"){const node=el(id);node.className=kind;node.textContent=message}
+async function api(path,options={}){
+ const response=await fetch(path,{...options,headers:{"X-API-Key":el("key").value.trim(),"Content-Type":"application/json",...(options.headers||{})}});
+ let payload;try{payload=await response.json()}catch{throw Error("Server returned an unexpected response ("+response.status+").")}
+ if(!response.ok)throw Error(payload.error||"Request failed ("+response.status+").");
+ return payload;
 }
-el("history-load").onclick=()=>viewBookings(false);
-el("history-more").onclick=()=>viewBookings(true);
-el("load").onclick=load;
-el("book").onclick=async()=>{const button=el("book");button.disabled=true;try{if(!el("slot").value)throw Error("Select an available appointment");const result=await api("/bookings",{method:"POST",headers:{"Idempotency-Key":crypto.randomUUID()},body:JSON.stringify({slot_id:el("slot").value,name:el("name").value,email:el("email").value})});report("Booking confirmed!\nReference: "+result.id+"\nPatient: "+result.name+"\nStatus: "+result.status,"success");await load();report("Booking confirmed!\nReference: "+result.id+"\nPatient: "+result.name+"\nStatus: "+result.status,"success")}catch(e){report(e.message,"error")}finally{button.disabled=false}};
+async function slots(){
+ const data=await api("/slots");
+ const now=Date.now();
+ const eligible=data.slots.filter(s=>s.available && Number.isFinite(Date.parse(s.start)) && Date.parse(s.start)>now);
+ const picker=el("slot");picker.replaceChildren();
+ for(const s of eligible)picker.add(new Option(s.provider+" · "+new Date(s.start).toLocaleString(),s.id));
+ el("booking-form").hidden=eligible.length===0;
+ note("availability",eligible.length ? eligible.length+" API-provided future slot(s) available. Providers and times are shown exactly as returned by the API." : "No appointments are currently available. The clinic API has not provided any bookable future slots.");
+}
+async function bookings(more=false){
+ const email=el("email").value.trim().toLowerCase();
+ if(!email)throw Error("Enter your booking email address.");
+ if(more&&(!state.cursor||email!==state.email))return;
+ if(!more){state.cursor=null;state.email=email;el("history").replaceChildren();}
+ const args=new URLSearchParams({email:state.email,limit:"10"});
+ if(more)args.set("cursor",state.cursor);
+ const data=await api("/bookings?"+args.toString());
+ for(const b of data.bookings){
+   const card=document.createElement("article");card.className="booking";
+   const header=document.createElement("strong");header.textContent=b.name+" · "+b.status;
+   const info=document.createElement("p");info.textContent="Booking reference: "+b.id;
+   const meta=document.createElement("p");meta.className="muted";meta.textContent="Slot ID: "+b.slot_id+" · Created: "+new Date(b.created_at).toLocaleString();
+   card.append(header,info,meta);
+   if(b.status==="confirmed"){
+    const button=document.createElement("button");button.type="button";button.className="secondary small";button.textContent="Cancel booking";
+    button.onclick=async()=>{if(!confirm("Cancel this booking?"))return;button.disabled=true;try{await api("/bookings/"+encodeURIComponent(b.id),{method:"DELETE"});header.textContent=b.name+" · cancelled";button.remove();note("history-status","Booking cancelled.","success");await slots()}catch(e){note("history-status",e.message,"error");button.disabled=false}};
+    card.append(button);
+   }
+   el("history").append(card);
+ }
+ state.cursor=data.next_cursor||null;el("more").hidden=!state.cursor;
+ note("history-status",el("history").children.length ? "Booking records returned by the API for this email." : "No bookings found for this email. No appointment has been assumed.");
+}
+async function run(more=false){
+ if(state.busy)return;
+ if(!el("key").value.trim()){note("status","Enter your API key.","error");return}
+ if(!el("email").value.trim()||!el("email").checkValidity()){note("status","Enter a valid booking email.","error");return}
+ state.busy=true;el("start").disabled=true;el("more").disabled=true;
+ try{
+  if(more){await bookings(true)}
+  else{
+   note("status","Checking the API…");
+   const results=await Promise.allSettled([bookings(),slots()]);
+   const errors=results.filter(r=>r.status==="rejected").map(r=>r.reason.message);
+   note("status",errors.length?errors.join(" | "):"API check complete.",errors.length?"error":"success");
+   if(results[0].status==="rejected")note("history-status",results[0].reason.message,"error");
+   if(results[1].status==="rejected"){el("booking-form").hidden=true;note("availability",results[1].reason.message,"error")}
+  }
+ }catch(e){note("history-status",e.message,"error")}finally{state.busy=false;el("start").disabled=false;el("more").disabled=false}
+}
+el("start").onclick=()=>run(false);el("more").onclick=()=>run(true);
+el("book").onclick=async()=>{
+ const button=el("book");button.disabled=true;
+ try{
+  if(!el("slot").value)throw Error("No appointment is selected.");
+  if(!el("name").value.trim())throw Error("Enter the patient's name.");
+  const data=await api("/bookings",{method:"POST",headers:{"Idempotency-Key":crypto.randomUUID()},body:JSON.stringify({slot_id:el("slot").value,name:el("name").value,email:el("email").value})});
+  note("confirmation","Booking confirmed. Reference: "+data.id,"success");
+  await run(false);
+ }catch(e){note("confirmation",e.message,"error")}finally{button.disabled=false}
+};
 </script></body></html>
